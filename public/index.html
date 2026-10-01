@@ -6,63 +6,141 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="/socket.io/socket.io.js"></script>
 </head>
-<body class="bg-[#313338] text-gray-200 h-screen flex flex-col font-sans">
+<body class="bg-[#313338] text-gray-200 h-screen flex flex-col font-sans overflow-hidden">
 
   <!-- AUTH SCREEN -->
-  <div id="authScreen" class="fixed inset-0 bg-[#1e1f22] flex items-center justify-center p-4">
-    <div class="bg-[#2b2d31] p-6 rounded-lg w-full max-w-sm space-y-4 shadow-xl">
-      <h2 class="text-xl font-bold text-white text-center">Staff Login / Register</h2>
+  <div id="authScreen" class="fixed inset-0 bg-[#1e1f22] flex items-center justify-center p-4 z-50">
+    <div class="bg-[#2b2d31] p-6 rounded-lg w-full max-w-sm space-y-4 shadow-xl border border-gray-800">
+      <h2 class="text-xl font-bold text-white text-center">Staff Terminal</h2>
       <div id="authErr" class="text-red-400 text-xs text-center hidden"></div>
-      <input id="userIn" class="w-full p-2 rounded bg-[#1e1f22] text-white focus:outline-none" placeholder="Username" />
-      <input id="passIn" type="password" class="w-full p-2 rounded bg-[#1e1f22] text-white focus:outline-none" placeholder="Password" />
+      <input id="userIn" class="w-full p-2.5 rounded bg-[#1e1f22] text-white focus:outline-none" placeholder="Minecraft Username" />
+      <input id="passIn" type="password" class="w-full p-2.5 rounded bg-[#1e1f22] text-white focus:outline-none" placeholder="Password" />
       <div class="flex gap-2">
-        <button onclick="handleAuth('login')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 py-2 rounded font-semibold text-white">Login</button>
-        <button onclick="handleAuth('register')" class="flex-1 bg-gray-600 hover:bg-gray-700 py-2 rounded font-semibold text-white">Register</button>
+        <button onclick="auth('login')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 py-2 rounded font-semibold text-white">Login</button>
+        <button onclick="auth('register')" class="flex-1 bg-gray-600 hover:bg-gray-700 py-2 rounded font-semibold text-white">Register</button>
       </div>
     </div>
   </div>
 
-  <!-- CHAT INTERFACE -->
+  <!-- MAIN APP CONTAINER -->
   <div id="chatScreen" class="flex h-screen hidden">
-    <!-- Sidebar -->
-    <div class="w-60 bg-[#2b2d31] flex flex-col justify-between border-r border-[#1e1f22]">
+
+    <!-- LEFT SIDEBAR: Channels & Settings -->
+    <div class="w-64 bg-[#2b2d31] flex flex-col justify-between border-r border-[#1e1f22]">
       <div class="p-3">
-        <h1 class="font-bold text-white border-b border-[#1e1f22] pb-2 mb-3">⛏️ Staff Headquarters</h1>
-        <div class="text-xs uppercase text-gray-400 font-bold mb-2">Channels</div>
-        <button onclick="switchChan('announcements')" class="w-full text-left px-2 py-1.5 rounded hover:bg-[#35373c] text-sm text-gray-300">📢 #announcements</button>
-        <button onclick="switchChan('staff-general')" class="w-full text-left px-2 py-1.5 rounded hover:bg-[#35373c] text-sm text-gray-300">💬 #staff-general</button>
-        <button onclick="switchChan('builders')" class="w-full text-left px-2 py-1.5 rounded hover:bg-[#35373c] text-sm text-gray-300">🔨 #builders</button>
+        <div class="flex items-center justify-between border-b border-[#1e1f22] pb-2 mb-3">
+          <span class="font-bold text-white tracking-wide">⚔️ MC Staff</span>
+          <button id="adminBtn" onclick="openModal('adminModal')" class="hidden text-xs bg-indigo-600 hover:bg-indigo-700 px-2 py-1 rounded text-white font-semibold">⚙️ Settings</button>
+        </div>
+
+        <div class="flex items-center justify-between text-xs uppercase text-gray-400 font-bold mb-2">
+          <span>Channels</span>
+          <button id="addChanBtn" onclick="openChannelModal()" class="hidden text-gray-300 hover:text-white text-base leading-none">+</button>
+        </div>
+        <div id="channelList" class="space-y-1"></div>
       </div>
 
-      <!-- User footer -->
-      <div class="bg-[#232428] p-3 flex flex-col gap-2">
-        <button id="toggleRegBtn" onclick="toggleReg()" class="hidden text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold py-1 rounded">Lock Registration</button>
-        <div class="flex justify-between items-center text-xs">
-          <div><span id="myUsername" class="font-bold text-white"></span> <span id="myRole" class="text-emerald-400"></span></div>
-          <button onclick="location.reload()" class="text-red-400 hover:underline">Exit</button>
+      <!-- Bottom User Card -->
+      <div class="bg-[#232428] p-3 flex justify-between items-center text-xs">
+        <div>
+          <div id="myUsername" class="font-bold text-white"></div>
+          <div id="myRole" class="text-emerald-400 font-mono"></div>
         </div>
+        <button onclick="location.reload()" class="text-red-400 hover:underline">Exit</button>
       </div>
     </div>
 
-    <!-- Main Message Area -->
+    <!-- MIDDLE: Chat Room -->
     <div class="flex-1 flex flex-col bg-[#313338]">
-      <div class="h-12 border-b border-[#1e1f22] flex items-center px-4 font-bold text-white">
-        #<span id="activeChan">staff-general</span>
+      <div class="h-12 border-b border-[#1e1f22] flex items-center px-4 justify-between">
+        <div class="font-bold text-white flex items-center gap-2">
+          <span class="text-gray-500">#</span><span id="activeChanTitle"></span>
+        </div>
+        <div id="chanActions" class="hidden flex gap-2">
+          <button onclick="openChannelModal(currentChannelId)" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded">Edit</button>
+          <button onclick="deleteCurrentChannel()" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">Delete</button>
+        </div>
       </div>
+
+      <!-- Message History -->
       <div id="messagesList" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
-      <form onsubmit="send(event)" class="p-4 bg-[#313338]">
+
+      <!-- Input box -->
+      <form onsubmit="sendMessage(event)" class="p-4 bg-[#313338]">
         <input id="msgInput" class="w-full bg-[#383a40] text-white px-4 py-2.5 rounded-lg focus:outline-none" placeholder="Message..." />
       </form>
+    </div>
+
+    <!-- RIGHT SIDEBAR: Member List -->
+    <div class="w-56 bg-[#2b2d31] border-l border-[#1e1f22] p-3 overflow-y-auto flex flex-col">
+      <div class="text-xs uppercase text-gray-400 font-bold mb-3 tracking-wider">Staff List</div>
+      <div id="memberList" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- OWNER MODAL: Roles & Server Config -->
+  <div id="adminModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-4 z-40">
+    <div class="bg-[#2b2d31] p-6 rounded-lg w-full max-w-md space-y-4 border border-gray-700">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-white text-lg">Server Settings</h3>
+        <button onclick="closeModal('adminModal')" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+
+      <!-- Toggle Reg -->
+      <div class="flex items-center justify-between p-3 bg-[#1e1f22] rounded">
+        <span class="text-sm">Allow New Registrations</span>
+        <button id="toggleRegBtn" onclick="toggleReg()" class="text-xs px-3 py-1.5 rounded font-bold text-white"></button>
+      </div>
+
+      <!-- Create Role -->
+      <div class="p-3 bg-[#1e1f22] rounded space-y-2">
+        <label class="text-xs uppercase text-gray-400 font-bold">Create New Role</label>
+        <div class="flex gap-2">
+          <input id="newRoleName" class="flex-1 bg-[#2b2d31] p-2 text-sm rounded text-white focus:outline-none" placeholder="e.g. Builder" />
+          <button onclick="createRole()" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-2 text-xs font-bold rounded text-white">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHANNEL MODAL (Create / Edit) -->
+  <div id="channelModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-4 z-40">
+    <div class="bg-[#2b2d31] p-6 rounded-lg w-full max-w-md space-y-4 border border-gray-700">
+      <div class="flex justify-between items-center">
+        <h3 id="chanModalTitle" class="font-bold text-white text-lg">Create Channel</h3>
+        <button onclick="closeModal('channelModal')" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+
+      <input id="chanNameIn" class="w-full bg-[#1e1f22] p-2 text-sm rounded text-white focus:outline-none" placeholder="channel-name" />
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" id="chanReadOnlyIn" class="rounded bg-[#1e1f22]" />
+        <span>Read-Only (Announcements - Owner post only)</span>
+      </label>
+
+      <div>
+        <label class="text-xs uppercase text-gray-400 font-bold block mb-1">Allowed Roles (Blank = Everyone)</label>
+        <div id="roleCheckboxes" class="space-y-1 bg-[#1e1f22] p-2 rounded max-h-32 overflow-y-auto"></div>
+      </div>
+
+      <button onclick="saveChannel()" class="w-full bg-indigo-600 hover:bg-indigo-700 py-2 rounded text-sm font-bold text-white">Save Channel</button>
     </div>
   </div>
 
   <script>
     const socket = io();
+    let state = { users: [], roles: [], channels: [], messages: [], settings: {} };
     let currentUser = null;
-    let currentChannel = 'staff-general';
-    let allMessages = [];
+    let currentChannelId = null;
+    let editingChannelId = null;
 
-    async function handleAuth(action) {
+    async function syncState() {
+      const res = await fetch('/api/state');
+      state = await res.json();
+      renderUI();
+    }
+
+    async function auth(action) {
       const username = document.getElementById('userIn').value.trim();
       const password = document.getElementById('passIn').value.trim();
       const res = await fetch('/api/auth', {
@@ -76,59 +154,227 @@
         document.getElementById('authErr').classList.remove('hidden');
         return;
       }
+
       currentUser = data.user;
       document.getElementById('authScreen').classList.add('hidden');
       document.getElementById('chatScreen').classList.remove('hidden');
       document.getElementById('myUsername').innerText = currentUser.username;
       document.getElementById('myRole').innerText = `[${currentUser.role}]`;
-      if (currentUser.role === 'Owner') document.getElementById('toggleRegBtn').classList.remove('hidden');
-      renderMessages();
+
+      if (currentUser.role === 'Owner') {
+        document.getElementById('adminBtn').classList.remove('hidden');
+        document.getElementById('addChanBtn').classList.remove('hidden');
+      }
+
+      await syncState();
+      if (state.channels.length > 0) switchChan(state.channels[0].id);
     }
 
-    function switchChan(chan) {
-      currentChannel = chan;
-      document.getElementById('activeChan').innerText = chan;
+    function switchChan(id) {
+      currentChannelId = id;
       renderMessages();
+      renderUI();
+    }
+
+    function renderUI() {
+      // 1. Channel List
+      const chanBox = document.getElementById('channelList');
+      chanBox.innerHTML = '';
+      
+      const visibleChannels = state.channels.filter(c => {
+        if (currentUser.role === 'Owner') return true;
+        if (c.allowedRoles.includes('*') || c.allowedRoles.includes(currentUser.role)) return true;
+        return false;
+      });
+
+      visibleChannels.forEach(c => {
+        const isActive = c.id === currentChannelId;
+        chanBox.innerHTML += `
+          <button onclick="switchChan('${c.id}')" class="w-full text-left px-2.5 py-1.5 rounded flex items-center justify-between text-sm ${isActive ? 'bg-[#35373c] text-white font-semibold' : 'text-gray-400 hover:bg-[#35373c]/50'}">
+            <span># ${c.name}</span>
+            ${c.isReadOnly ? '<span class="text-[10px] bg-gray-800 text-gray-400 px-1 rounded">Read-only</span>' : ''}
+          </button>
+        `;
+      });
+
+      const currentChan = state.channels.find(c => c.id === currentChannelId);
+      if (currentChan) {
+        document.getElementById('activeChanTitle').innerText = currentChan.name;
+        document.getElementById('chanActions').style.display = currentUser.role === 'Owner' ? 'flex' : 'none';
+      }
+
+      // 2. Member List
+      const memberBox = document.getElementById('memberList');
+      memberBox.innerHTML = '';
+      state.users.forEach(u => {
+        let ownerActions = '';
+        if (currentUser.role === 'Owner' && u.username !== currentUser.username) {
+          const roleOptions = state.roles.map(r => `<option value="${r.name}" ${u.role === r.name ? 'selected' : ''}>${r.name}</option>`).join('');
+          ownerActions = `
+            <div class="mt-1 flex gap-1">
+              <select onchange="changeRole('${u.username}', this.value)" class="bg-[#1e1f22] text-[10px] rounded text-white p-0.5">
+                ${roleOptions}
+              </select>
+              <button onclick="toggleBan('${u.username}')" class="text-[10px] ${u.isBanned ? 'bg-emerald-600' : 'bg-red-600'} text-white px-1.5 rounded">
+                ${u.isBanned ? 'Unban' : 'Ban'}
+              </button>
+            </div>
+          `;
+        }
+
+        memberBox.innerHTML += `
+          <div class="p-1.5 rounded bg-[#1e1f22]/50 ${u.isBanned ? 'opacity-40' : ''}">
+            <div class="font-semibold text-white text-xs flex justify-between">
+              <span>${u.username}</span>
+              ${u.isBanned ? '<span class="text-[9px] text-red-500 font-bold uppercase">BANNED</span>' : ''}
+            </div>
+            <div class="text-[10px] text-emerald-400 font-mono">[${u.role}]</div>
+            ${ownerActions}
+          </div>
+        `;
+      });
+
+      // 3. Reg Button state
+      const regBtn = document.getElementById('toggleRegBtn');
+      regBtn.innerText = state.settings.regOpen ? 'Lock Registration' : 'Open Registration';
+      regBtn.className = state.settings.regOpen ? 'text-xs px-3 py-1.5 rounded font-bold bg-amber-600' : 'text-xs px-3 py-1.5 rounded font-bold bg-green-600';
     }
 
     function renderMessages() {
       const box = document.getElementById('messagesList');
       box.innerHTML = '';
-      allMessages.filter(m => m.channel === currentChannel).forEach(m => {
+      state.messages.filter(m => m.channelId === currentChannelId).forEach(m => {
         box.innerHTML += `
           <div>
-            <span class="font-bold text-white">${m.user}</span>
-            <span class="text-[10px] bg-gray-700 px-1 rounded text-gray-300 font-mono">${m.role}</span>
-            <span class="text-xs text-gray-500">${m.time}</span>
-            <div class="text-sm text-gray-300">${m.text}</div>
-          </div>`;
+            <div class="flex items-baseline gap-2">
+              <span class="font-bold text-white text-sm">${m.user}</span>
+              <span class="text-[10px] bg-gray-700 px-1 rounded text-gray-300 font-mono">${m.role}</span>
+              <span class="text-[10px] text-gray-500">${m.time}</span>
+            </div>
+            <div class="text-sm text-gray-300 mt-0.5">${m.text}</div>
+          </div>
+        `;
       });
       box.scrollTop = box.scrollHeight;
     }
 
-    function send(e) {
+    function sendMessage(e) {
       e.preventDefault();
       const input = document.getElementById('msgInput');
-      if (!input.value.trim()) return;
-      socket.emit('send_msg', { user: currentUser, channel: currentChannel, text: input.value });
+      if (!input.value.trim() || !currentChannelId) return;
+      socket.emit('send_msg', { user: currentUser, channelId: currentChannelId, text: input.value });
       input.value = '';
     }
 
+    // Owner Operations
     async function toggleReg() {
-      const res = await fetch('/api/toggle-reg', {
+      await fetch('/api/toggle-reg', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: currentUser.username })
       });
-      const data = await res.json();
-      const btn = document.getElementById('toggleRegBtn');
-      btn.innerText = data.regOpen ? 'Lock Registration' : 'Open Registration';
-      btn.className = data.regOpen ? 'text-xs bg-amber-600 text-white font-bold py-1 rounded' : 'text-xs bg-green-600 text-white font-bold py-1 rounded';
     }
 
-    socket.on('init_messages', (msgs) => { allMessages = msgs; renderMessages(); });
-    socket.on('new_msg', (msg) => { allMessages.push(msg); renderMessages(); });
+    async function createRole() {
+      const name = document.getElementById('newRoleName').value.trim();
+      if (!name) return;
+      await fetch('/api/roles/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser.username, roleName: name })
+      });
+      document.getElementById('newRoleName').value = '';
+    }
+
+    async function changeRole(targetUsername, newRole) {
+      await fetch('/api/users/set-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser.username, targetUsername, newRole })
+      });
+    }
+
+    async function toggleBan(targetUsername) {
+      await fetch('/api/users/toggle-ban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser.username, targetUsername })
+      });
+    }
+
+    function openChannelModal(id = null) {
+      editingChannelId = id;
+      const modal = document.getElementById('channelModal');
+      const title = document.getElementById('chanModalTitle');
+      const nameIn = document.getElementById('chanNameIn');
+      const readOnlyIn = document.getElementById('chanReadOnlyIn');
+      const rolesBox = document.getElementById('roleCheckboxes');
+
+      rolesBox.innerHTML = '';
+      const existing = id ? state.channels.find(c => c.id === id) : null;
+
+      title.innerText = id ? 'Edit Channel' : 'Create Channel';
+      nameIn.value = existing ? existing.name : '';
+      readOnlyIn.checked = existing ? existing.isReadOnly : false;
+
+      state.roles.forEach(r => {
+        const isChecked = existing ? existing.allowedRoles.includes(r.name) || existing.allowedRoles.includes('*') : true;
+        rolesBox.innerHTML += `
+          <label class="flex items-center gap-2 text-xs">
+            <input type="checkbox" value="${r.name}" class="role-check" ${isChecked ? 'checked' : ''} />
+            <span>${r.name}</span>
+          </label>
+        `;
+      });
+
+      modal.classList.remove('hidden');
+    }
+
+    async function saveChannel() {
+      const name = document.getElementById('chanNameIn').value.trim();
+      const isReadOnly = document.getElementById('chanReadOnlyIn').checked;
+      const allowedRoles = Array.from(document.querySelectorAll('.role-check:checked')).map(el => el.value);
+
+      await fetch('/api/channels/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: currentUser.username,
+          id: editingChannelId,
+          name,
+          isReadOnly,
+          allowedRoles: allowedRoles.length === state.roles.length ? ['*'] : allowedRoles
+        })
+      });
+      closeModal('channelModal');
+    }
+
+    async function deleteCurrentChannel() {
+      if (!confirm('Are you sure you want to delete this channel?')) return;
+      await fetch('/api/channels/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser.username, channelId: currentChannelId })
+      });
+      currentChannelId = state.channels[0]?.id || null;
+    }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    // Sockets
+    socket.on('sync_data', () => syncState());
+    socket.on('new_msg', (msg) => {
+      state.messages.push(msg);
+      if (msg.channelId === currentChannelId) renderMessages();
+    });
     socket.on('error_msg', (err) => alert(err));
+    socket.on('user_banned_event', (e) => {
+      if (currentUser && currentUser.username === e.username && e.isBanned) {
+        alert('You have been banned from this server.');
+        location.reload();
+      }
+    });
   </script>
 </body>
 </html>
